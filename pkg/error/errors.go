@@ -13,6 +13,7 @@ type StackError struct {
 }
 
 var stopKeyWords []byte
+var rTrimCutSet = string([]byte{byte(0), '\n'})
 
 func SetStopKeyWords(bts []byte) {
 	stopKeyWords = bts
@@ -71,11 +72,14 @@ func getStackWithoutString(stack []byte, stop []byte) string {
 		endIndex += lineLen + 1
 	}
 	firstLine := string(stack[:firstLineEndIndex])
-	body := string(stack[startIndex:endIndex])
-	return firstLine + body
+	body := bytes.TrimRight(stack[startIndex:endIndex], rTrimCutSet)
+	return firstLine + string(body)
 }
 
 func WrapStackError(unknownErr error) *StackError {
+	if unknownErr == nil {
+		return nil
+	}
 	errObj, ok := unknownErr.(*StackError)
 	if ok {
 		return errObj
