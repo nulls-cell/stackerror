@@ -2,6 +2,7 @@ package stackerror
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"runtime/debug"
 )
@@ -76,11 +77,12 @@ func getStackWithoutString(stack []byte, stop []byte) string {
 	return firstLine + string(body)
 }
 
-func WrapStackError(unknownErr error) *StackError {
+func WrapStackError(unknownErr error) IStackError {
 	if unknownErr == nil {
 		return nil
 	}
-	errObj, ok := unknownErr.(*StackError)
+	var errObj *StackError
+	ok := errors.As(unknownErr, &errObj)
 	if ok {
 		return errObj
 	}
