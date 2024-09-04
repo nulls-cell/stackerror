@@ -8,9 +8,9 @@ import (
 )
 
 type StackError struct {
-	msg          string
-	runtimeStack string
-	OrgError     error
+	msg               string
+	runtimeStackBytes []byte
+	OrgError          error
 }
 
 var stopKeyWords []byte
@@ -29,35 +29,39 @@ func (r *StackError) Error() string {
 }
 
 func (r *StackError) GetStack() string {
-	return r.runtimeStack
+	return getStackByBytes(r.runtimeStackBytes, stopKeyWords)
 }
 
 func (r *StackError) GetStackErrMsg() string {
-	return r.msg + "\n" + r.runtimeStack
+	return r.msg + "\n" + getStackByBytes(r.runtimeStackBytes, stopKeyWords)
 }
 
-func NewStackError(msg string) *StackError {
-	stack := getStackWithoutString(debug.Stack(), stopKeyWords)
+func (r *StackError) GetDepthStackErrMsg(depth int32) string {
+	return r.msg + "\n" + getDepthStackByBytes(r.runtimeStackBytes, stopKeyWords, depth)
+}
+
+func NewError(msg string) *StackError {
+	stack := debug.Stack()
 	err := &StackError{
-		msg:          msg,
-		runtimeStack: stack,
-		OrgError:     nil,
+		msg:               msg,
+		runtimeStackBytes: stack,
+		OrgError:          nil,
 	}
 	return err
 }
 
-func NewStackErrorf(format string, args ...interface{}) *StackError {
+func NewErrorf(format string, args ...interface{}) *StackError {
 	msg := fmt.Sprintf(format, args...)
-	stack := getStackWithoutString(debug.Stack(), stopKeyWords)
+	stack := debug.Stack()
 	err := &StackError{
-		msg:          msg,
-		runtimeStack: stack,
-		OrgError:     nil,
+		msg:               msg,
+		runtimeStackBytes: stack,
+		OrgError:          nil,
 	}
 	return err
 }
 
-func getStackWithoutString(stack []byte, stop []byte) string {
+func getStackByBytes(stack []byte, stop []byte) string {
 	var firstLineEndIndex, startIndex, endIndex int
 	lines := bytes.Split(stack, []byte{'\n'})
 	for i, line := range lines {
@@ -77,7 +81,37 @@ func getStackWithoutString(stack []byte, stop []byte) string {
 	return firstLine + string(body)
 }
 
-func WrapStackError(unknownErr error) IStackError {
+func getDepthStackByBytes(stack []byte, stop []byte, depth int32) string {
+	var firstLineEndIndex, startIndex, endIndex int
+	if depth <= 0 {
+		depth = 1 << 30
+	} else {
+		depth *= 2
+		depth += 5
+	}
+	lines := bytes.Split(stack, []byte{'\n'})
+	for i, line := range lines {
+		lineLen := len(line)
+		if i == 0 {
+			firstLineEndIndex = lineLen + 1
+		}
+		if i <= 4 {
+			startIndex += lineLen + 1
+		} else if len(stop) > 0 && bytes.Contains(line, stop) {
+			break
+		}
+		endIndex += lineLen + 1
+		depth -= 1
+		if depth == 0 {
+			break
+		}
+	}
+	firstLine := string(stack[:firstLineEndIndex])
+	body := bytes.TrimRight(stack[startIndex:endIndex], rTrimCutSet)
+	return firstLine + string(body)
+}
+
+func Wrap(unknownErr error) IStackError {
 	if unknownErr == nil {
 		return nil
 	}
@@ -86,12 +120,11 @@ func WrapStackError(unknownErr error) IStackError {
 	if ok {
 		return errObj
 	}
-	stack := getStackWithoutString(debug.Stack(), stopKeyWords)
 
 	newErr := &StackError{
-		msg:          unknownErr.Error(),
-		runtimeStack: stack,
-		OrgError:     unknownErr,
+		msg:               unknownErr.Error(),
+		runtimeStackBytes: debug.Stack(),
+		OrgError:          unknownErr,
 	}
 	return newErr
 }
@@ -100,4 +133,5 @@ type IStackError interface {
 	Error() string
 	GetStack() string
 	GetStackErrMsg() string
+	GetDepthStackErrMsg(depth int32) string
 }
