@@ -40,7 +40,7 @@ func (r *StackError) GetDepthStackErrMsg(depth int32) string {
 	return r.msg + "\n" + getDepthStackByBytes(r.runtimeStackBytes, stopKeyWords, depth)
 }
 
-func NewError(msg string) *StackError {
+func Error(msg string) *StackError {
 	stack := debug.Stack()
 	err := &StackError{
 		msg:               msg,
@@ -50,7 +50,7 @@ func NewError(msg string) *StackError {
 	return err
 }
 
-func NewErrorf(format string, args ...interface{}) *StackError {
+func Errorf(format string, args ...interface{}) *StackError {
 	msg := fmt.Sprintf(format, args...)
 	stack := debug.Stack()
 	err := &StackError{
@@ -111,7 +111,7 @@ func getDepthStackByBytes(stack []byte, stop []byte, depth int32) string {
 	return firstLine + string(body)
 }
 
-func Wrap(unknownErr error) IStackError {
+func Wrap(unknownErr error) IError {
 	if unknownErr == nil {
 		return nil
 	}
@@ -129,7 +129,7 @@ func Wrap(unknownErr error) IStackError {
 	return newErr
 }
 
-type IStackError interface {
+type IError interface {
 	Error() string
 	GetStack() string
 	GetStackErrMsg() string
